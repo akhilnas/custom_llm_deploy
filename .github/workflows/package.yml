@@ -13,7 +13,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         # Assumes you have set up an IAM Role for GitHub Actions (recommended)
-        rrole-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
         aws-region: us-east-1
     - name: Start AWS CodeBuild
       uses: aws-actions/aws-codebuild-run-build@v1
