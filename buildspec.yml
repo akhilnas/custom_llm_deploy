@@ -5,7 +5,7 @@ phases:
     commands:
       - echo "Setting up build environment..."
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - echo "Building for commit: $COMMIT_HASH"
+      - echo "Building for commit - $COMMIT_HASH"
       - RAW_MODEL_S3_URI="s3://custom-llm-model-directory/gemma3-12b/" 
       - DEPLOY_ARTIFACT_S3_URI="s3://sagemaker-gemma3-akhil-09oct/" 
 
