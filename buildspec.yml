@@ -1,43 +1,38 @@
 version: 0.2
 
 phases:
-  # The pre_build phase is for logging in to dependencies or setting variables.
   pre_build:
     commands:
-      - echo "Starting the SageMaker model packaging process..."
+      - echo "Setting up build environment..."
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - echo "Building for commit: $COMMIT_HASH"
-      - RAW_MODEL_S3_URI="s3://custom-llm-model-directory/gemma3-12b/"
-      - DEPLOY_ARTIFACT_S3_URI="s3://sagemaker-gemma3-akhil-09oct/"
+      - RAW_MODEL_S3_URI="s3://custom-llm-model-directory/gemma3-12b/" 
+      - DEPLOY_ARTIFACT_S3_URI="s3://sagemaker-gemma3-akhil-09oct/" 
 
-  # The build phase is where the main work happens.
   build:
     commands:
-      - echo "Step 1: Creating a temporary staging directory..."
+      - echo "Step 1: Creating staging directory"
       - mkdir staging
-
-      - echo "Step 2: Downloading the large model files from S3..."
+      
+      - echo "Step 2: Syncing model files from S3. This may take a while..."
       - aws s3 sync $RAW_MODEL_S3_URI ./staging/
-
-      - echo "Step 3: Copying the inference code into the staging directory..."
+      
+      - echo "Step 3: Copying inference code"
       - cp -r ./code ./staging/
-
-      - echo "Step 4: Creating the final model.tar.gz artifact..."
+      
+      - echo "Step 4: Compressing artifact into model.tar.gz"
       - cd staging
       - tar -czvf ../model.tar.gz .
       - cd ..
       
-      - echo "Step 5: Uploading the final artifact to S3 for SageMaker..."
+      - echo "Step 5: Uploading final artifact to S3"
       - aws s3 cp model.tar.gz ${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz
 
-  # The post_build phase is for cleanup or notifications.
   post_build:
     commands:
-      - echo "Build completed successfully."
-      - echo "The final artifact is available at ${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz"
+      - echo "Build completed on $(date)"
+      - echo "Final artifact is at ${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz"
 
-# The artifacts section officially declares the output of the build.
-# This is useful if you chain this into a full AWS CodePipeline.
 artifacts:
   files:
     - model.tar.gz
