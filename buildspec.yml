@@ -11,21 +11,21 @@ phases:
 
   build:
     commands:
-      - echo "Step 1: Creating staging directory"
+      - echo "Step 1 - Creating staging directory"
       - mkdir staging
       
-      - echo "Step 2: Syncing model files from S3. This may take a while..."
+      - echo "Step 2 - Syncing model files from S3. This may take a while..."
       - aws s3 sync $RAW_MODEL_S3_URI ./staging/
       
-      - echo "Step 3: Copying inference code"
+      - echo "Step 3 - Copying inference code"
       - cp -r ./code ./staging/
       
-      - echo "Step 4: Compressing artifact into model.tar.gz"
+      - echo "Step 4 - Compressing artifact into model.tar.gz"
       - cd staging
       - tar -czvf ../model.tar.gz .
       - cd ..
       
-      - echo "Step 5: Uploading final artifact to S3"
+      - echo "Step 5 - Uploading final artifact to S3"
       - aws s3 cp model.tar.gz ${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz
 
   post_build:
