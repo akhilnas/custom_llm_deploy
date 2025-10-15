@@ -1,0 +1,49 @@
+# .github/workflows/package-for-sagemaker.yml
+
+name: Package Model for SageMaker Deployment
+
+on:
+  push:
+    branches:
+      - main  
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for AWS OIDC authentication
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-1
+
+    - name: Create staging directory
+      run: mkdir staging
+
+    - name: Download sharded model files from S3
+      run: |
+        aws s3 sync s3://custom-llm-model-directory/gemma3-12b/ ./staging/
+      
+    - name: Copy inference code to staging directory
+      run: cp -r ./src/ ./staging/
+
+    - name: Create the SageMaker model artifact (model.tar.gz)
+      run: |
+        cd staging
+        tar -czvf ../model.tar.gz .
+        cd ..
+
+    - name: Upload final artifact to S3 for SageMaker
+      # Use the git commit SHA for unique versioning of the artifact
+      run: |
+        aws s3 cp model.tar.gz s3://your-bucket-name/sagemaker-artifacts/model-${{ github.sha }}.tar.gz
+        
+    - name: Clean up local files
+      run: rm -rf staging model.tar.gz```
