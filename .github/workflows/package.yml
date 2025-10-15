@@ -5,13 +5,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for AWS OIDC authentication
+      contents: read
     steps:
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         # Assumes you have set up an IAM Role for GitHub Actions (recommended)
-        role-to-assume: arn:aws:iam::ACCOUNT-ID:role/your-github-actions-role
-        aws-region: your-aws-region
+        rrole-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: us-east-1
     - name: Start AWS CodeBuild
       uses: aws-actions/aws-codebuild-run-build@v1
       with:
