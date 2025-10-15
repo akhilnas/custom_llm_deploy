@@ -18,7 +18,7 @@ phases:
       - aws s3 sync $RAW_MODEL_S3_URI ./staging/
       
       - echo "Step 3 - Copying inference code"
-      - cp -r ./code ./staging/
+      - cp -r ./src ./staging/
       
       - echo "Step 4 - Compressing artifact into model.tar.gz"
       - cd staging
