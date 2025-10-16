@@ -6,32 +6,46 @@ phases:
       - echo "Setting up build environment..."
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - echo "Building for commit - $COMMIT_HASH"
-      - RAW_MODEL_S3_URI="s3://custom-llm-model-directory/gemma3-12b/" 
-      - DEPLOY_ARTIFACT_S3_URI="s3://sagemaker-gemma3-akhil-09oct/" 
 
   build:
     commands:
-      - echo "Step 1 - Creating staging directory"
+
+      - echo "Step 1 - Defining S3 paths"
+      - RAW_MODEL_S3_URI="s3://custom-llm-model-directory/gemma3-12b/" 
+      - DEPLOY_ARTIFACT_S3_URI="s3://sagemaker-gemma3-akhil-09oct/" 
+      - FINAL_ARTIFACT_PATH="${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz"
+      
+      - echo "Step 2 - Creating staging directory"
       - mkdir staging
       
-      - echo "Step 2 - Syncing model files from S3. This may take a while..."
+      - echo "Step 3 - Syncing model files from S3. This may take a while..."
       - aws s3 sync $RAW_MODEL_S3_URI ./staging/
       
-      - echo "Step 3 - Copying inference code"
+      - echo "Step 4 - Copying inference code"
       - cp -r ./src ./staging/
       
-      - echo "Step 4 - Compressing artifact into model.tar.gz"
+      - echo "Step 5 - Compressing artifact into model.tar.gz"
       - cd staging
       - tar -czvf ../model.tar.gz .
       - cd ..
       
-      - echo "Step 5 - Uploading final artifact to S3"
-      - aws s3 cp model.tar.gz ${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz
+      - echo "Step 6 - Uploading final artifact to S3"
+      - aws s3 cp model.tar.gz $FINAL_ARTIFACT_PATH
+
+      # For use in Deployment
+      - export MODEL_ARTIFACT_S3_URI=$FINAL_ARTIFACT_PATH
 
   post_build:
     commands:
-      - echo "Build completed on $(date)"
-      - echo "Final artifact is at ${DEPLOY_ARTIFACT_S3_URI}model-${COMMIT_HASH}.tar.gz"
+      - echo "Build completed on $(date). Starting deployment phase..."
+      - echo "Final artifact is at $FINAL_ARTIFACT_PATH"
+
+      - echo "Step 7 - Installing deployment dependencies"
+      - pip install -r deploy_requirements.txt
+
+      - echo "Step 8 - Executing deployment script..."
+      # The SAGEMAKER_ROLE_ARN variable is passed in from the CodeBuild project's environment settings
+      - python deploy.py
 
 artifacts:
   files:
