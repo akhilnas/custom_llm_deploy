@@ -1,0 +1,4 @@
+# Upgrade transformers to a version that recognizes the 'gemma3' architecture
+transformers==4.57.1
+accelerate>=0.29.0
+torch
