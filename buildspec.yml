@@ -19,7 +19,7 @@ phases:
       - mkdir staging
       
       - echo "Step 3 - Syncing model files from S3. This may take a while..."
-      - aws s3 sync $RAW_MODEL_S3_URI ./staging/
+      - cp -R /mnt/efs-data/* ./staging/   #aws s3 sync $RAW_MODEL_S3_URI ./staging/
       
       - echo "Step 4 - Copying inference code"
       - cp -r ./src ./staging/
