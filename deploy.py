@@ -30,11 +30,59 @@ asg_client = boto3.client("application-autoscaling", region_name=region)
 cw_client = boto3.client("cloudwatch", region_name=region)
 
 # =====================================================================================
+# DISCOVER OLD RESOURCES FOR CLEANUP
+# =====================================================================================
+
+print("\n[0/7] Discovering existing resources for cleanup...")
+old_model_name = None
+old_endpoint_config_name = None
+
+try:
+    endpoint_desc = sm_client.describe_endpoint(EndpointName=endpoint_name)
+    old_endpoint_config_name = endpoint_desc['EndpointConfigName']
+    print(f"   Found existing endpoint config: {old_endpoint_config_name}")
+
+    config_desc = sm_client.describe_endpoint_config(EndpointConfigName=old_endpoint_config_name)
+    # Note: Inference Components don't list models here, so we look for the model attached to the IC
+    ic_desc = sm_client.describe_inference_component(InferenceComponentName=inference_component_name)
+    old_model_name = ic_desc['Specification']['ModelName']
+    print(f"   Found existing model to be replaced: {old_model_name}")
+
+except sm_client.exceptions.ClientError as e:
+    error_code = e.response['Error']['Code']
+    if 'ValidationException' in error_code or 'ResourceNotFound' in error_code:
+        print("   No existing endpoint found. Will proceed with a new creation.")
+    else:
+        raise # Re-raise other unexpected errors
+
+# =====================================================================================
+# CLEAN UP OLD, DETACHED RESOURCES
+# =====================================================================================
+print(f"\n[1/7] Cleaning up old resources...")
+
+if old_model_name:
+    try:
+        sm_client.delete_model(ModelName=old_model_name)
+        print(f"✅ Successfully deleted old model: {old_model_name}")
+    except sm_client.exceptions.ClientError as e:
+        print(f"⚠️  Could not delete old model '{old_model_name}'. It might already be gone. Error: {e}")
+
+if old_endpoint_config_name:
+    try:
+        # Note: SageMaker might still be cleaning up the old EC, so this can sometimes fail.
+        # In a production system, you might build a separate cleanup lambda. For this project, it's fine.
+        sm_client.delete_endpoint_config(EndpointConfigName=old_endpoint_config_name)
+        print(f"✅ Successfully deleted old endpoint config: {old_endpoint_config_name}")
+    except sm_client.exceptions.ClientError as e:
+        print(f"⚠️  Could not delete old endpoint config '{old_endpoint_config_name}'. It might already be gone. Error: {e}")
+
+
+# =====================================================================================
 # MODEL CREATION
 # =====================================================================================
 
 model_name = f"gemma-3-12b-model-{int(time.time())}"
-print(f"\n[1/6] Creating SageMaker Model: {model_name}")
+print(f"\n[2/7] Creating SageMaker Model: {model_name}")
 
 # Get the HuggingFace DLC image URI
 huggingface_model = HuggingFaceModel(
@@ -75,7 +123,7 @@ print(f"✅ Model created: {model_name}")
 # =====================================================================================
 
 endpoint_config_name = f"gemma-3-12b-config-{int(time.time())}"
-print(f"\n[2/6] Creating Endpoint Configuration: {endpoint_config_name}")
+print(f"\n[3/7] Creating Endpoint Configuration: {endpoint_config_name}")
 print(" Note: NOT specifying ModelName - this will be attached via Inference Component")
 
 endpoint_config_response = sm_client.create_endpoint_config(
@@ -105,7 +153,7 @@ print(f"✅ Endpoint configuration created with MinInstanceCount=0")
 # CREATE ENDPOINT
 # =====================================================================================
 
-print(f"\n[3/6] Creating Endpoint: {endpoint_name}")
+print(f"\n[4/7] Creating Endpoint: {endpoint_name}")
 
 try:
     sm_client.create_endpoint(
@@ -135,7 +183,7 @@ except sm_client.exceptions.ClientError as e:
 # This attaches the model to the endpoint with resource specifications
 # =====================================================================================
 
-print(f"\n[4/6] Creating Inference Component: {inference_component_name}")
+print(f"\n[5/7] Creating Inference Component: {inference_component_name}")
 
 try:
     ic_response = sm_client.create_inference_component(
@@ -193,7 +241,7 @@ except sm_client.exceptions.ClientError as e:
 # CONFIGURE AUTO-SCALING (SCALE-IN TO ZERO)
 # =====================================================================================
 
-print(f"\n[5/6] Configuring auto-scaling to scale IN to zero...")
+print(f"\n[6/7] Configuring auto-scaling to scale IN to zero...")
 
 resource_id = f"inference-component/{inference_component_name}"
 
@@ -237,7 +285,7 @@ print(f"✅ Target tracking policy applied for scale-in (15 min cooldown)")
 # CONFIGURE SCALE-OUT FROM ZERO (STEP SCALING + CLOUDWATCH ALARM)
 # =====================================================================================
 
-print(f"\n[6/6] Configuring auto-scaling to scale OUT from zero...")
+print(f"\n[7/7] Configuring auto-scaling to scale OUT from zero...")
 
 # Create step scaling policy
 step_policy_response = asg_client.put_scaling_policy(
