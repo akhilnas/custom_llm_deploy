@@ -6,6 +6,8 @@ phases:
       - echo "Setting up build environment..."
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - echo "Building for commit - $COMMIT_HASH"
+      - echo "Confirming EFS mount point exists..."
+      - ls -ld /mnt/efs-data # This command should succeed, showing an empty directory
 
   build:
     commands:
@@ -18,16 +20,18 @@ phases:
       - echo "Step 2 - Creating staging directory"
       - mkdir staging
       
-      - echo "Step 3 - Syncing model files from S3. This may take a while..."
-      - cp -R /mnt/efs-data/* ./staging/   #aws s3 sync $RAW_MODEL_S3_URI ./staging/
+      - echo "Step 3 - Copying application source files TO the EFS mount point..."
+      - cp -R ./src /mnt/efs-data/   #aws s3 sync $RAW_MODEL_S3_URI ./staging/
+      - echo "Verifying files were copied to EFS..."
+      - ls -laR /mnt/efs-data
       
       - echo "Step 4 - Copying inference code"
       - cp -r ./src ./staging/
       
       - echo "Step 5 - Compressing artifact into model.tar.gz"
-      - cd staging
-      - tar -czvf ../model.tar.gz .
-      - cd ..
+      - cd /mnt/efs-data/
+      - tar -czvf ../../model.tar.gz .
+      - cd ../..
       
       - echo "Step 6 - Uploading final artifact to S3"
       - aws s3 cp model.tar.gz $FINAL_ARTIFACT_PATH
