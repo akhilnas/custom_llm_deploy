@@ -21,7 +21,7 @@ phases:
       - mkdir staging
       
       - echo "Step 3 - Copying application source files TO the EFS mount point..."
-      - cp -R ./src /mnt/efs-data/   #aws s3 sync $RAW_MODEL_S3_URI ./staging/
+      - cp -R ./src/* /mnt/efs-data/   #aws s3 sync $RAW_MODEL_S3_URI ./staging/
       - echo "Verifying files were copied to EFS..."
       - ls -laR /mnt/efs-data
       
@@ -30,8 +30,8 @@ phases:
       
       - echo "Step 5 - Compressing artifact into model.tar.gz"
       - cd /mnt/efs-data/
-      - tar -czvf ../../model.tar.gz .
-      - cd ../..
+      - tar -czvf ../../../model.tar.gz .
+      - cd ../../..
       
       - echo "Step 6 - Uploading final artifact to S3"
       - aws s3 cp model.tar.gz $FINAL_ARTIFACT_PATH
